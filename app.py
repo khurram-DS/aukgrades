@@ -32,7 +32,7 @@ def main():
     st.markdown(new_title2, unsafe_allow_html=True)
     new_title3 = '<p style="font-family:sans-serif; color:purple; font-size: 14 px;">   Lecturer at College of Business And Economics </p>'
     st.markdown(new_title3, unsafe_allow_html=True)
-    new_title4 = '<p style="font-family:sans-serif; color:purple; font-size: 14 px;"> American University of Kuwait  <a  href="aalsaber@auk.edu.kw"> Email </a> </p> '
+    new_title4 = '<p style="font-family:sans-serif; color:purple; font-size: 14 px;"> American University of Kuwait  <a  href=" mailto: aalsaber@auk.edu.kw"> Email </a> </p> '
     st.markdown(new_title4, unsafe_allow_html=True)
     
     
