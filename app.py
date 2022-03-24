@@ -30,15 +30,27 @@ def main():
     st.markdown(new_title1, unsafe_allow_html=True)
     new_title2 = '<p style="font-family:sans-serif; color:Blue; font-size: 15px;">➡ Ahmed R.Alsaber </p>'
     st.markdown(new_title2, unsafe_allow_html=True)
-    new_title3 = '<p style="font-family:sans-serif; color:purple; font-size: 14 px;">   Lecturer at College of Business And Economics </p>'
+    new_title3 = '<p style="font-family:sans-serif; color:purple; font-size: 14px;">   Lecturer at College of Business And Economics </p>'
     st.markdown(new_title3, unsafe_allow_html=True)
-    new_title4 = '<p style="font-family:sans-serif; color:purple; font-size: 14 px;"> American University of Kuwait  <a  href=" mailto: aalsaber@auk.edu.kw"> Email </a> </p> '
+    new_title4 = '<p style="font-family:sans-serif; color:purple; font-size: 14px;"> American University of Kuwait  <a  href=" mailto: aalsaber@auk.edu.kw"> Email </a> </p> '
     st.markdown(new_title4, unsafe_allow_html=True)
+    st.text('------------------------------------------------------------------------------------------------------------------------------')
+    
+    form=pd.read_excel('static/temp.xlsx')
+    import base64
+    import io
+    towrite = io.BytesIO()
+    downloaded_file = form.to_excel(towrite, encoding='utf-8', index=False, header=True) # write to BytesIO buffer
+    towrite.seek(0)  # reset pointer
+    b64 = base64.b64encode(towrite.read()).decode() 
+    linko= f"<p style='font-family:sans-serif; color:Black; font-size: 20px;'> Please upload the file in given format <a href='data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}' download='grades_template.xlsx' >Download Template </a> </p> "
+    st.markdown(linko, unsafe_allow_html=True)
+    
     
     
 
     st.sidebar.image("static/confu.png", use_column_width=True)
-    activites = ["About","Overall","Course","Section","Major","College"]
+    activites = ["About","Overall","Gender","Course","Section","Major","College"]
     choice =st.sidebar.selectbox("Select Activity",activites)
     def get_df(file):
       # get extension and read file
@@ -165,45 +177,17 @@ are explained below Figure)""")
             else:
                 st.write('✘ Your grade is [ FN ] as your Total work is  {} '.format(Total_work))
 
-            
-        if st.checkbox('Show the Shape'):
-            
-            st.subheader("Shape of the Data = ")
-            st.subheader("{} rows with {} columns".format(df.shape[0],df.shape[1]))
-            
         
-            
-        if st.checkbox("Select Columns to show"):
-            all_columns=df.columns.to_list()
-            selected_columns= st.multiselect("Select Columns", all_columns)
-            cnt=df[selected_columns]
-            st.dataframe(cnt)
-            st.text("Download the Above Data by clicking on Download CSV")
-            st.download_button(label='Download CSV',data=cnt.to_csv(),mime='text/csv')
             
         if st.checkbox("Show summary statistics"):
             st.subheader('Summary statistics')
-            st.write(df.describe().T)
-            
-        if st.checkbox("Statistics estimated on the input data"):
-            st.text('Statistics estimated on the input data and computed using the')
-            st.text('estimated parameters of the Normal distribution:')
-            
             import numpy as np
             from scipy.stats import kurtosis, skew
-            newdf=df._get_numeric_data()
-            
-            skew=skew(newdf)
-            kur=kurtosis(newdf) \
-            
-            mean=newdf.mean().round(4)
-            var=newdf.var().round(4)
-            stat=pd.DataFrame({"mean":mean,
-                  "variance":var,
-                  "skewness":skew,
-                  "kurtosis":kur})
-            
-            st.write(stat)
+            stats=df.describe()
+            stats.loc['SEM']=df.sem().tolist()
+            stats.loc['skewness']=df.skew().tolist()
+            stats.loc['kurtosis']=df.kurtosis().tolist()
+            st.write(stats.T)
             
             
         if st.checkbox("Select Columns to see frequency table"):
@@ -252,6 +236,7 @@ are explained below Figure)""")
             from chart_studio import plotly as py
             import plotly
             from plotly import tools
+            import seaborn as sns
             
             x = df['Total_work']
             hist_data = [x]
@@ -536,7 +521,236 @@ are explained below Figure)""")
         
         
             #based on course analysis    
+    elif choice == "Gender":
+        st.subheader("Gender Based Grades Analysis")
         
+        if st.checkbox("Show Gender frequency table"):
+            Gender = df.Gender
+            counts = Gender.value_counts()
+            percent = Gender.value_counts(normalize=True).mul(100).round(1).astype(str) + '%'
+            Gender=pd.DataFrame({'counts': counts,'Frequency %': percent})
+            Gender.reset_index(inplace = True)
+            Gender.rename(columns={'index':'Gender'},inplace=True)
+            Gender['Total_data']=Gender['counts'].sum()
+            st.dataframe(Gender)
+            
+            st.text("Download the Above Data table by clicking on Download CSV")
+            st.download_button(label='Download CSV',data=Gender.to_csv(),mime='text/csv')
+            import plotly.express as px
+            fig1 = px.bar(Gender, x="Gender", y="counts", color="Frequency %", title="Frequency counts for different Genders")
+            st.write(fig1)
+            
+        if st.checkbox("Show Summary statistics"):
+            stat=df.groupby('Gender')['Total_work'].describe()
+            st.subheader('Summary statistics for Gender based on the Total_work')
+            stat['skewness']=df.groupby('Gender')['Total_work'].skew()
+            stat['SEM']=df.groupby('Gender')['Total_work'].sem()
+            st.write(stat)
+        
+        if st.checkbox("Show t-test for two independent samples / Two-tailed test for the Gender"):
+            
+            from pylab import rcParams
+            from scipy.stats import f_oneway
+            from scipy.stats import ttest_ind
+            import seaborn as sns
+            import numpy as np
+            import warnings            
+            warnings.filterwarnings("ignore")
+            Gender_a=df.loc[df['Gender'] == 'F']['Total_work']
+            Gender_b=df.loc[df['Gender'] == 'M']['Total_work']            
+            rcParams['figure.figsize'] = 20,10
+            rcParams['font.size'] = 30
+            sns.set()
+            np.random.seed(8)
+            
+            st.subheader('T-test result table')
+            st.text('➊ For Eng. and Business')
+            import pingouin as pg
+
+            st.write(pg.ttest(Gender_a, Gender_b, correction=False))
+        
+        # ttest Gender a and Gender b
+            st.subheader('Lets understand the t-test result for Gender more deeply') 
+            
+            if st.checkbox("Show the t-test for Total work | Gender-Eng. - Total work | Gender-Business"):
+                st.subheader('Lets check the length of Eng. and Business')
+                st.text("Length of Eng.")
+                st.write(len(Gender_a))
+                
+                st.text("Length of Business")
+                st.write(len(Gender_b))
+                st.subheader("t-test for two independent samples / Two-tailed test (Total work | Gender-Eng. - Total work | Gender-Business):")
+                st.subheader('Making some Asuumations')
+                st.text('Assumption 1: Are the two samples independent?')
+                st.text('Assumption 2: Are the data from each of the 2 groups following a normal distribution?')
+                
+                
+                st.subheader('Checking the Normality of Data')
+                st.text(' Checking normality of data for Eng. using shapiro test')
+                
+                from scipy.stats import shapiro
+                stat, p = shapiro(Gender_a)
+                
+                # interpret
+                alpha = 0.05
+                if p > alpha:
+                    msg = 'Sample looks Gaussian (fail to reject H0)'
+                else:
+                    msg = 'Sample does not look Gaussian (reject H0)'
+                
+                result_mat = [
+                    ['Length of the sample data', 'Test Statistic', 'p-value', 'Comments'],
+                    [len(Gender_a), stat, p, msg]
+                ]
+                import plotly.figure_factory as ff
+                swt_table = ff.create_table(result_mat)
+                swt_table['data'][0].colorscale=[[0, '#2a3f5f'],[1, '#ffffff']]
+                swt_table['layout']['height']=200
+                swt_table['layout']['margin']['t']=50
+                swt_table['layout']['margin']['b']=50
+                
+                #py.iplot(swt_table, filename='shapiro-wilk-table')
+                st.write(swt_table)
+                
+ # Gender_b               
+                st.text('Checking normality of data for Business using shapiro test')
+                
+                from scipy.stats import shapiro
+                stat, p = shapiro(Gender_b)
+                
+                # interpret
+                alpha = 0.05
+                if p > alpha:
+                    msg = 'Sample looks Gaussian (fail to reject H0)'
+                else:
+                    msg = 'Sample does not look Gaussian (reject H0)'
+                
+                result_mat = [
+                    ['Length of the sample data', 'Test Statistic', 'p-value', 'Comments'],
+                    [len(Gender_b), stat, p, msg]
+                ]
+                import plotly.figure_factory as ff
+                swt_table = ff.create_table(result_mat)
+                swt_table['data'][0].colorscale=[[0, '#2a3f5f'],[1, '#ffffff']]
+                swt_table['layout']['height']=200
+                swt_table['layout']['margin']['t']=50
+                swt_table['layout']['margin']['b']=50
+                
+                #py.iplot(swt_table, filename='shapiro-wilk-table')
+                st.write(swt_table)
+                
+            #t-test
+                st.subheader('lets see the t-test results for Total work | Gender-Eng. - Total work | Gender-Business"): ')
+                import pingouin as pg
+
+                res = pg.ttest(Gender_a, Gender_b, correction=False)
+                st.write(res)
+                
+                st.download_button(label='Download t-test results',data=res.to_csv(),mime='text/csv')
+        #test interpretation
+                st.subheader('Test interpretation: results ')
+                st.write('✍  T-value is  [[ {} ]] '.format(res['T'][0]))
+                st.text('● T is simply the calculated difference represented in units of standard error')
+                st.write('✍ Degree of freedom is [[ {} ]]'.format(res['dof'][0]))
+                st.text('● Degrees of freedom refers to the maximum number of logically independent values')
+                st.write('✍ 95% confidence interval on the difference between the means: is [[ {} ]]'.format(res['CI95%'][0]))
+                st.text('● A 95% CI simply means that if the study is conducted multiple times (multiple sampling from the same population)')
+                st.write('✍ Cohens d (realtive strength) value is [[ {} ]]'.format(res['CI95%'][0]))
+                st.text('● Cohens d is an effect size used to indicate the standardised difference between two means ')
+                
+                
+                alpha=0.05
+                if res['p-val'][0] > alpha:
+                    st.write('✍  As p-value is Greater than alpha=0.05 thus, Sample looks Gaussian (fail to reject H0)')
+                else:
+                    st.write('✍  As p-value is lesser than alpha=0.05 thus,Sample does not look Gaussian (reject H0)')
+                    
+                st.text('● The p-value is the probability of obtaining results at least as extreme as the observed results of a statistical hypothesis test')
+                st.text('➊ Null hypotheses(HO): Two group means are equal')
+                st.text('➋ Alternative hypotheses(H1): Two group means are different')
+                
+                st.subheader('Plot for Two-tailed test (Total work | Gender-Eng. - Total work | Gender-Business):')
+                import matplotlib.pyplot as plt
+                def plot_distribution(inp):
+                    plt.figure()
+                    ax = sns.distplot(inp)
+                    plt.axvline(np.mean(inp), color="k", linestyle="dashed", linewidth=5)
+                    _, max_ = plt.ylim()
+                    plt.text(
+                        inp.mean() + inp.mean() / 10,
+                        max_ - max_ / 10,
+                        "Mean: {:.2f}".format(inp.mean()),
+                    )
+                    return plt.figure
+                
+                ax1 = sns.distplot(Gender_a)
+                ax2 = sns.distplot(Gender_b)
+                plt.axvline(np.mean(Gender_a), color='b', linestyle='dashed', linewidth=5)
+                plt.axvline(np.mean(Gender_b), color='orange', linestyle='dashed', linewidth=5)
+                st.pyplot(plt)
+                showPyplotGlobalUse = False
+        #boxplot
+        if st.checkbox("Show Plots for different Gender, based on total work"):
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            from plotly.offline import init_notebook_mode, iplot
+            import plotly.figure_factory as ff
+            import cufflinks
+            cufflinks.go_offline()
+            cufflinks.set_config_file(world_readable=True, theme='pearl')
+            import plotly.graph_objs as go
+            import chart_studio.plotly as py
+            import plotly.offline as py
+            import plotly
+            from plotly import tools
+            trace0 = go.Box(
+                    y=df.loc[df['Gender'] == 'F']['Total_work'],
+                    name = 'Female',
+                    marker = dict(
+                        color = 'rgb(214, 12, 140)',
+                    )
+                )
+            trace1 = go.Box(
+                    y=df.loc[df['Gender'] == 'M']['Total_work'],
+                    name = 'Male',
+                    marker = dict(
+                        color = 'rgb(0, 128, 128)',
+                    )
+                )
+            
+                
+            data1 = [trace0, trace1]
+            layout1 = go.Layout(
+                    title = "Boxplot of Gender in terms of Total_work"
+                )
+                
+            fig1 = go.Figure(data1,layout1)
+            st.write(fig1)
+            
+            #histogram plot        
+            st.subheader('Histogram plot for Total_work for all the Genders')
+            
+            trace0 = go.Histogram(
+                    x=df.loc[df['Gender'] == 'F']['Total_work'], name='With Female',
+                    opacity=0.75
+                )
+            trace1 = go.Histogram(
+                    x=df.loc[df['Gender'] == 'M']['Total_work'], name='with Male',
+                    opacity=0.75
+                    
+                )
+           
+            data = [trace0, trace1]
+                
+            layout = go.Layout(barmode='overlay', title='Histogram of Total_work for all the Gender')
+            fig2 = go.Figure(data=data, layout=layout)
+            st.write(fig2)
+            
+            
+            st.subheader("Thats all for Gender based analysis")
+            st.subheader("Navigate the activity to see other analysis 👉")
+            
+            st.text('© American University of Kuwait')
         
     elif choice == "Course":
         st.subheader("Course Based Grades Analysis")
@@ -557,10 +771,34 @@ are explained below Figure)""")
             fig = px.bar(Course, x="Course", y="counts", color="Frequency %", title="Frequency counts for different Courses")
             st.write(fig)
             
+            
         if st.checkbox("Show Summary statistics"):
-            stat=df.groupby('Course')['Total_work'].describe()
+            stats=df.groupby('Course')['Total_work'].describe()
             st.subheader('Summary statistics for Course based on the Total_work')
-            st.write(stat)
+            import numpy as np
+            from scipy.stats import kurtosis, skew
+            
+            stats['SEM']=df.groupby('Course')['Total_work'].sem()
+            stats['skewness']=df.groupby('Course')['Total_work'].skew()
+            #stats.loc['kurtosis']=df.groupby('Course')['Total_work'].kurtosis()
+            st.write(stats)
+            stats.reset_index(inplace=True)
+            mean=df.groupby('Course')['Total_work'].mean().round(2)
+            std=df.groupby('Course')['Total_work'].std().round(2)
+            med=df.groupby('Course')['Total_work'].median().round(2)
+            mn=df.groupby('Course')['Total_work'].min().round(2)
+            mx=df.groupby('Course')['Total_work'].max().round(2)
+            for x in range(len(stats)):
+                skew= 0
+                if stats['skewness'][x] < skew:
+                    st.write("""● For {} , the observations of Total_work had an average of {} (SD = {}, SEM = {}, Min = {}, Max = {}, Skewness = {}, Mdn = {}). As the skewness is negative that implies that the mean is higher than the median, and that is an indication that students achieving better and they received high marks
+                             """.format(stats.Course[x],mean[x],std[x],stats.SEM[x].round(2),mn[x],mx[x],stats.skewness[x].round(2),med[x]))
+                else:
+                    st.write("""● For {} , the observations of Total_work had an average of {} (SD = {}, SEM = {}, Min = {}, Max = {}, Skewness = {}, Mdn = {}). As the skewness is Positive that implies that the mean is lower than the median, and that is an indication that students have lower performance and they received lower marks
+                             """.format(stats.Course[x],mean[x],std[x],stats.SEM[x].round(2),mn[x],mx[x],stats.skewness[x].round(2),med[x]))    
+        
+            st.write("""According to Westfall & Henning (2013), when the skewness is greater than 2 in absolute value, the variable is considered to be asymmetrical about its mean. The summary statistics can be found in Table""")
+            st.text('------------------------------------------------------------------------------------------------------------------------------')
         
         if st.checkbox("Show t-test for two independent samples / Two-tailed test for the course"):
             
@@ -956,6 +1194,26 @@ are explained below Figure)""")
                 plt.axvline(np.mean(course_c), color='orange', linestyle='dashed', linewidth=5)
                 st.pyplot(plt)
                 showPyplotGlobalUse = False
+                
+        if st.checkbox("Show Anova test for all the group"):
+            st.subheader('Anova Test')
+            from statsmodels.formula.api import ols
+            import statsmodels.api as sm
+            anova_students = ols('Total_work~Course',data=df).fit()
+            # examine the anova table 
+            anova_table_sm = sm.stats.anova_lm(anova_students, type=2)
+            st.write(anova_table_sm)
+            res=anova_table_sm
+            alpha=0.05
+            if res['PR(>F)'][0] > alpha:
+                st.write('✍  As p-value is Greater than alpha=0.05 thus, Sample looks Gaussian (fail to reject H0)')
+            else:
+                st.write('✍  As p-value is lesser than alpha=0.05 thus,Sample does not look Gaussian (reject H0)')
+                                
+            st.text("""● The p-value is the probability of obtaining results at least 
+  as extreme as the observed results of a statistical hypothesis test""")
+            st.text('➊ Null hypotheses(HO): The means of the results are not significantly different')
+            st.text('➋ Alternative hypotheses(H1): At least one of the means of the results were significantly different from others')   
     #plot
         if st.checkbox("Show Plots for different course, based on total work"):
             import matplotlib.pyplot as plt
@@ -1058,6 +1316,8 @@ are explained below Figure)""")
         if st.checkbox("Show Summary statistics"):
             stat=df.groupby('Section')['Total_work'].describe()
             st.subheader('Summary statistics for Section based on the Total_work')
+            stat['skewness']=df.groupby('Section')['Total_work'].skew()
+            stat['SEM']=df.groupby('Section')['Total_work'].sem()
             st.write(stat)
         
         if st.checkbox("Show t-test for two independent samples / Two-tailed test for the Section"):
@@ -1293,7 +1553,9 @@ are explained below Figure)""")
             
         if st.checkbox("Show Summary statistics"):
             stat=df.groupby('Major')['Total_work'].describe()
-            st.subheader('Summary statistics for Marketingased on the Total_work')
+            st.subheader('Summary statistics for Major on the Total_work')
+            stat['skewness']=df.groupby('Major')['Total_work'].skew()
+            stat['SEM']=df.groupby('Major')['Total_work'].sem()
             st.write(stat)
         
         if st.checkbox("Show t-test for two independent samples / Two-tailed test for the Major"):
@@ -1690,6 +1952,27 @@ are explained below Figure)""")
                 plt.axvline(np.mean(Major_c), color='orange', linestyle='dashed', linewidth=5)
                 st.pyplot(plt)
                 showPyplotGlobalUse = False
+                
+        if st.checkbox("Show Anova test for all the group"):
+            st.subheader('Anova Test')
+            from statsmodels.formula.api import ols
+            import statsmodels.api as sm
+            anova_students = ols('Total_work~Major',data=df).fit()
+            # examine the anova table 
+            anova_table_sm = sm.stats.anova_lm(anova_students, type=2)
+            st.write(anova_table_sm)
+            res=anova_table_sm
+            alpha=0.05
+            if res['PR(>F)'][0] > alpha:
+                st.write('✍  As p-value is Greater than alpha=0.05 thus, Sample looks Gaussian (fail to reject H0)')
+            else:
+                st.write('✍  As p-value is lesser than alpha=0.05 thus,Sample does not look Gaussian (reject H0)')
+                                
+            st.text("""● The p-value is the probability of obtaining results at least 
+  as extreme as the observed results of a statistical hypothesis test""")
+            st.text('➊ Null hypotheses(HO): The means of the results are not significantly different')
+            st.text('➋ Alternative hypotheses(H1): At least one of the means of the results were significantly different from others')        
+                
     #plot
         if st.checkbox("Show Plots for different Major, based on total work"):
             import matplotlib.pyplot as plt
@@ -1788,6 +2071,8 @@ are explained below Figure)""")
         if st.checkbox("Show Summary statistics"):
             stat=df.groupby('College')['Total_work'].describe()
             st.subheader('Summary statistics for College based on the Total_work')
+            stat['skewness']=df.groupby('College')['Total_work'].skew()
+            stat['SEM']=df.groupby('College')['Total_work'].sem()
             st.write(stat)
         
         if st.checkbox("Show t-test for two independent samples / Two-tailed test for the College"):
